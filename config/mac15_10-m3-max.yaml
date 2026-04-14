@@ -1,0 +1,19 @@
+fan_indices: [0, 1]
+sample_interval_ms: 1500
+hysteresis_c: 2.0
+
+target:
+  group: all_cpu_candidates
+  reduce: max
+
+points:
+  - temp_c: 45.0
+    rpm: 1300
+  - temp_c: 60.0
+    rpm: 2200
+  - temp_c: 70.0
+    rpm: 3200
+  - temp_c: 80.0
+    rpm: 4300
+  - temp_c: 90.0
+    rpm: 5600

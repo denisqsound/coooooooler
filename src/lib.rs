@@ -1,0 +1,15 @@
+pub mod app_settings;
+pub mod config;
+pub mod control_backend;
+pub mod fan_control;
+pub mod gui;
+pub mod helper_client;
+pub mod helper_install;
+pub mod helper_paths;
+pub mod helper_protocol;
+pub mod helper_server;
+pub mod platform;
+pub mod runtime;
+pub mod sensor_profile;
+pub mod single_instance;
+pub mod smc_controller;
