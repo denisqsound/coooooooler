@@ -1,9 +1,14 @@
-# Rust
-/target/
-/.cargo/
-
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Rust
+/target/
+*.rs.bk
+
+# Cargo
+/.cargo/
 
 # Editors
 .idea/
@@ -12,6 +17,23 @@
 *.swo
 *~
 
-# Environment
+# Cursor
+.cursor/
+
+# Local environment and secrets
 .env
 .env.*
+*.local
+*.secret
+*.secrets
+*.pem
+*.key
+*.p12
+*.crt
+*.cer
+
+# Logs
+*.log
+
+# Local app/runtime artifacts
+*.sock

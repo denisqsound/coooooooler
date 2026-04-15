@@ -1,90 +1,163 @@
 # Apple Silicon Fan Control
 
-A native macOS application for controlling fans on Apple Silicon Macs via SMC. Includes both a GUI (eframe) and a CLI.
+Experimental macOS fan control app for Apple Silicon Macs, written in Rust.
 
-## Features
+This project focuses on a simple workflow for M-series MacBooks:
 
-- Read temperatures from SMC sensors (CPU, GPU, etc.)
-- Set fan speed manually or use automatic curve-based control
-- YAML-based fan curve configuration with hysteresis
-- Privileged helper for fan writes without running as root
-- Single-instance guard — only one GUI copy runs at a time
+- choose the component temperature to watch
+- choose the temperature where fan speed should reach maximum
+- let the app ramp fan speed smoothly from quiet to max
+- switch back to system control at any time
+- force maximum cooling when needed
 
-## Building
+The app currently targets Apple Silicon only. Intel Macs are out of scope.
 
-```bash
-cargo build --release
-```
+## Status
 
-## Usage
+This is an experimental utility that talks to Apple SMC and uses a privileged helper for real fan writes.
 
-### GUI
+Use it carefully:
 
-```bash
-cargo run
-```
+- this is not an official Apple utility
+- this is not affiliated with or derived from the commercial Macs Fan Control app
+- hardware behavior and sensor mappings may differ between models and macOS versions
+- incorrect fan control can lead to noise, battery drain, or thermal behavior you do not want
 
-Or with helper management:
+## Current UI Model
 
-```bash
-./apple-silicon-fan-control --install-helper
-./apple-silicon-fan-control --uninstall-helper
-./apple-silicon-fan-control --helper-status
-```
+Each fan has three modes:
 
-### CLI
+- `Adaptive`: watch a selected component and smoothly ramp the fan to maximum at a chosen temperature
+- `System`: return control to the default macOS thermal policy
+- `Max`: force the fan to maximum allowed RPM
 
-```bash
-# System and fan diagnostics
-cargo run --bin apple-silicon-fan-control-cli -- doctor
+The intended main mode is `Adaptive`.
 
-# Read sensor temperatures
-cargo run --bin apple-silicon-fan-control-cli -- probe
-
-# Dump raw SMC keys
-cargo run --bin apple-silicon-fan-control-cli -- dump-keys --prefix T
-
-# Watch temperatures and fan curve (dry-run)
-cargo run --bin apple-silicon-fan-control-cli -- watch --config config/mac15_10-m3-max.yaml
-
-# Apply fan curve
-cargo run --bin apple-silicon-fan-control-cli -- watch --config config/mac15_10-m3-max.yaml --apply
-
-# Set fan RPM directly
-cargo run --bin apple-silicon-fan-control-cli -- set-rpm --fan 0 --rpm 3000
-
-# Return fans to automatic mode
-cargo run --bin apple-silicon-fan-control-cli -- auto
-```
-
-## Fan Curve Config
-
-Example (`config/mac15_10-m3-max.yaml`):
-
-```yaml
-fan_indices: [0, 1]
-sample_interval_ms: 1500
-hysteresis_c: 2.0
-
-target:
-  group: all_cpu_candidates
-  reduce: max
-
-points:
-  - temp_c: 45.0
-    rpm: 1300
-  - temp_c: 60.0
-    rpm: 2200
-  - temp_c: 70.0
-    rpm: 3200
-  - temp_c: 80.0
-    rpm: 4300
-  - temp_c: 90.0
-    rpm: 5600
-```
-
-## Requirements
+## Supported Platform
 
 - macOS on Apple Silicon
-- Rust 2024 edition
-- Root privileges or installed privileged helper for fan control
+- tested against an M3 Max profile in this repository
+- Rust toolchain required for building from source
+
+## Project Layout
+
+- `apple-silicon-fan-control/`: Rust application, CLI, helper, and GUI
+- `Taskfile.yml`: convenient tasks for development, install, and autostart
+- `apple-silicon-fan-control/config/`: example config files and model-specific data
+
+## Build
+
+From the repository root:
+
+```bash
+task dev
+```
+
+Or directly:
+
+```bash
+cd apple-silicon-fan-control
+cargo build --bins
+cargo run --bin apple-silicon-fan-control
+```
+
+## Installation
+
+From the repository root:
+
+```bash
+task install
+```
+
+This will:
+
+- build release binaries
+- install the GUI app binary to `~/Applications/AppleSiliconFanControl`
+- install the helper binary next to it
+
+## Enable Real Fan Control
+
+The GUI can monitor temperatures without privileges, but changing fan RPM requires the privileged helper.
+
+After launching the app:
+
+1. Click `Enable Control`
+2. Approve the macOS administrator prompt
+3. The helper will be installed and used for live fan writes
+
+You can inspect helper state with:
+
+```bash
+task helper:status
+```
+
+## Autostart
+
+Enable launch at login:
+
+```bash
+task autostart
+```
+
+Disable it:
+
+```bash
+task autostart:off
+```
+
+Remove local installation:
+
+```bash
+task uninstall
+```
+
+## Other Useful Tasks
+
+```bash
+task test
+task doctor
+```
+
+- `task test`: run Rust tests
+- `task doctor`: print model, helper, SMC, and fan diagnostics
+
+## How Adaptive Mode Works
+
+`Adaptive` mode does not require you to hand-edit a full fan curve.
+
+Instead you choose:
+
+- the component or sensor group to track
+- the temperature where cooling should reach maximum
+
+The app then builds a smooth curve automatically:
+
+- lower temperatures stay near the fan's quiet minimum
+- fan speed ramps up as temperature rises
+- maximum RPM is reached at your chosen threshold
+
+## Known Limitations
+
+- sensor mappings are model-specific and may need adjustment for some Macs
+- helper installation is currently triggered from the app and depends on macOS administrator approval
+- this project is currently source-first and developer-oriented, not yet a polished packaged `.app`
+- the repository currently does not include signing, notarization, or a packaged installer
+
+## Publishing Notes
+
+Before making the repository public, review local build artifacts and local machine files.
+
+At minimum, do not publish:
+
+- `apple-silicon-fan-control/target/`
+- local terminal logs
+- local app install directories under `~/Applications`
+- any future private certificates, signing identities, or secret config files
+
+## License
+
+Add the license you want to publish this under before making the repository public.
+
+## Disclaimer
+
+This software is provided as-is. You are responsible for testing it on your own hardware and deciding whether you trust its fan behavior on your machine.

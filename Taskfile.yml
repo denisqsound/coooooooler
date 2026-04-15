@@ -1,0 +1,84 @@
+version: "3"
+
+vars:
+  INSTALL_DIR: '{{.HOME}}/Applications/AppleSiliconFanControl'
+  AUTOSTART_PLIST: '{{.HOME}}/Library/LaunchAgents/com.denisqsound.apple-silicon-fan-control.gui.plist'
+  GUI_BIN: '{{.INSTALL_DIR}}/apple-silicon-fan-control'
+  HELPER_BIN: '{{.INSTALL_DIR}}/apple-silicon-fan-control-helper'
+
+tasks:
+  dev:
+    desc: Launch the debug GUI for manual testing
+    cmds:
+      - cargo build --bins
+      - cargo run --bin apple-silicon-fan-control
+
+  test:
+    desc: Run the Rust test suite
+    cmds:
+      - cargo test
+
+  doctor:
+    desc: Print current hardware and fan diagnostics
+    cmds:
+      - cargo run --bin apple-silicon-fan-control-cli -- doctor
+
+  helper:status:
+    desc: Show privileged helper status
+    cmds:
+      - cargo run --bin apple-silicon-fan-control-cli -- helper status
+
+  install:
+    desc: Build release binaries and install app locally
+    cmds:
+      - cargo build --release --bins
+      - mkdir -p "{{.INSTALL_DIR}}"
+      - cp target/release/apple-silicon-fan-control "{{.GUI_BIN}}"
+      - cp target/release/apple-silicon-fan-control-helper "{{.HELPER_BIN}}"
+      - chmod +x "{{.GUI_BIN}}" "{{.HELPER_BIN}}"
+      - echo "Installed to {{.INSTALL_DIR}}"
+
+  autostart:
+    desc: Enable app launch at login
+    deps: [install]
+    cmds:
+      - mkdir -p "{{.HOME}}/Library/LaunchAgents"
+      - |
+        cat > "{{.AUTOSTART_PLIST}}" <<'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>Label</key>
+          <string>com.denisqsound.apple-silicon-fan-control.gui</string>
+          <key>ProgramArguments</key>
+          <array>
+            <string>{{.GUI_BIN}}</string>
+          </array>
+          <key>RunAtLoad</key>
+          <true/>
+          <key>KeepAlive</key>
+          <false/>
+          <key>ProcessType</key>
+          <string>Interactive</string>
+        </dict>
+        </plist>
+        EOF
+      - launchctl unload "{{.AUTOSTART_PLIST}}" 2>/dev/null || true
+      - launchctl load "{{.AUTOSTART_PLIST}}"
+      - echo "Autostart enabled"
+
+  autostart:off:
+    desc: Disable app launch at login
+    cmds:
+      - launchctl unload "{{.AUTOSTART_PLIST}}" 2>/dev/null || true
+      - rm -f "{{.AUTOSTART_PLIST}}"
+      - echo "Autostart disabled"
+
+  uninstall:
+    desc: Remove installed app files and autostart entry
+    cmds:
+      - task: autostart:off
+      - rm -f "{{.GUI_BIN}}" "{{.HELPER_BIN}}"
+      - rmdir "{{.INSTALL_DIR}}" 2>/dev/null || true
+      - echo "App files removed from {{.INSTALL_DIR}}"
