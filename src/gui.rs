@@ -26,17 +26,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+const APP_DISPLAY_NAME: &str = "coooooooler";
+
 pub fn run(instance_guard: SingleInstanceGuard) -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Apple Silicon Fan Control")
+            .with_title(APP_DISPLAY_NAME)
             .with_inner_size([1240.0, 880.0])
             .with_min_inner_size([980.0, 720.0]),
         ..Default::default()
     };
 
     eframe::run_native(
-        "Apple Silicon Fan Control",
+        APP_DISPLAY_NAME,
         options,
         Box::new(|cc| {
             configure_style(&cc.egui_ctx);

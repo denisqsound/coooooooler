@@ -1,10 +1,15 @@
 version: "3"
 
 vars:
-  INSTALL_DIR: '{{.HOME}}/Applications/AppleSiliconFanControl'
+  APP_NAME: coooooooler
+  APP_BUNDLE: '{{.HOME}}/Applications/{{.APP_NAME}}.app'
+  APP_CONTENTS_DIR: '{{.APP_BUNDLE}}/Contents'
+  APP_MACOS_DIR: '{{.APP_CONTENTS_DIR}}/MacOS'
+  APP_PLIST: '{{.APP_CONTENTS_DIR}}/Info.plist'
+  LEGACY_INSTALL_DIR: '{{.HOME}}/Applications/AppleSiliconFanControl'
   AUTOSTART_PLIST: '{{.HOME}}/Library/LaunchAgents/com.denisqsound.apple-silicon-fan-control.gui.plist'
-  GUI_BIN: '{{.INSTALL_DIR}}/apple-silicon-fan-control'
-  HELPER_BIN: '{{.INSTALL_DIR}}/apple-silicon-fan-control-helper'
+  GUI_BIN: '{{.APP_MACOS_DIR}}/{{.APP_NAME}}'
+  HELPER_BIN: '{{.APP_MACOS_DIR}}/apple-silicon-fan-control-helper'
 
 tasks:
   dev:
@@ -32,11 +37,41 @@ tasks:
     desc: Build release binaries and install app locally
     cmds:
       - cargo build --release --bins
-      - mkdir -p "{{.INSTALL_DIR}}"
+      - rm -rf "{{.LEGACY_INSTALL_DIR}}"
+      - mkdir -p "{{.APP_MACOS_DIR}}"
+      - |
+        cat > "{{.APP_PLIST}}" <<'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>CFBundleDevelopmentRegion</key>
+          <string>en</string>
+          <key>CFBundleDisplayName</key>
+          <string>{{.APP_NAME}}</string>
+          <key>CFBundleExecutable</key>
+          <string>{{.APP_NAME}}</string>
+          <key>CFBundleIdentifier</key>
+          <string>com.denisqsound.coooooooler</string>
+          <key>CFBundleInfoDictionaryVersion</key>
+          <string>6.0</string>
+          <key>CFBundleName</key>
+          <string>{{.APP_NAME}}</string>
+          <key>CFBundlePackageType</key>
+          <string>APPL</string>
+          <key>CFBundleShortVersionString</key>
+          <string>0.1.0</string>
+          <key>CFBundleVersion</key>
+          <string>0.1.0</string>
+          <key>LSMinimumSystemVersion</key>
+          <string>13.0</string>
+        </dict>
+        </plist>
+        EOF
       - cp target/release/apple-silicon-fan-control "{{.GUI_BIN}}"
       - cp target/release/apple-silicon-fan-control-helper "{{.HELPER_BIN}}"
       - chmod +x "{{.GUI_BIN}}" "{{.HELPER_BIN}}"
-      - echo "Installed to {{.INSTALL_DIR}}"
+      - echo "Installed to {{.APP_BUNDLE}}"
 
   autostart:
     desc: Enable app launch at login
@@ -79,6 +114,5 @@ tasks:
     desc: Remove installed app files and autostart entry
     cmds:
       - task: autostart:off
-      - rm -f "{{.GUI_BIN}}" "{{.HELPER_BIN}}"
-      - rmdir "{{.INSTALL_DIR}}" 2>/dev/null || true
-      - echo "App files removed from {{.INSTALL_DIR}}"
+      - rm -rf "{{.APP_BUNDLE}}" "{{.LEGACY_INSTALL_DIR}}"
+      - echo "App files removed from {{.APP_BUNDLE}}"

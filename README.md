@@ -72,8 +72,8 @@ task install
 This will:
 
 - build release binaries
-- install the GUI app binary to `~/Applications/AppleSiliconFanControl`
-- install the helper binary next to it
+- install a Finder-visible app bundle at `~/Applications/coooooooler.app`
+- install the helper binary inside that app bundle
 
 ## Enable Real Fan Control
 
