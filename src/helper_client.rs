@@ -11,6 +11,9 @@ use std::{
     time::Duration,
 };
 
+const HELPER_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
+const HELPER_APPLY_PLAN_TIMEOUT: Duration = Duration::from_secs(15);
+
 #[derive(Debug, Clone)]
 pub struct HelperClient {
     socket_path: PathBuf,
@@ -63,6 +66,7 @@ impl HelperClient {
     }
 
     fn send(&self, request: HelperRequest) -> Result<HelperResponse> {
+        let read_timeout = response_timeout(&request);
         let mut stream = UnixStream::connect(&self.socket_path).with_context(|| {
             format!(
                 "failed to connect to helper socket `{}`",
@@ -70,10 +74,10 @@ impl HelperClient {
             )
         })?;
         stream
-            .set_read_timeout(Some(Duration::from_secs(3)))
+            .set_read_timeout(Some(read_timeout))
             .context("failed to set helper socket read timeout")?;
         stream
-            .set_write_timeout(Some(Duration::from_secs(3)))
+            .set_write_timeout(Some(HELPER_REQUEST_TIMEOUT))
             .context("failed to set helper socket write timeout")?;
 
         let payload = serde_json::to_vec(&request).context("failed to encode helper request")?;
@@ -89,12 +93,45 @@ impl HelperClient {
         let mut line = String::new();
         reader
             .read_line(&mut line)
-            .context("failed to read helper response")?;
+            .with_context(|| {
+                format!(
+                    "failed to read helper response within {}s",
+                    read_timeout.as_secs()
+                )
+            })?;
         if line.trim().is_empty() {
             bail!("helper returned an empty response");
         }
 
         serde_json::from_str::<HelperResponse>(line.trim())
             .context("failed to decode helper response")
+    }
+}
+
+fn response_timeout(request: &HelperRequest) -> Duration {
+    match request {
+        // The helper can spend up to 10s unlocking manual fan control before it replies.
+        HelperRequest::ApplyPlan { .. } => HELPER_APPLY_PLAN_TIMEOUT,
+        HelperRequest::Ping | HelperRequest::ReadStatus => HELPER_REQUEST_TIMEOUT,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fan_control::FanControlPlan;
+
+    #[test]
+    fn ping_uses_short_timeout() {
+        assert_eq!(response_timeout(&HelperRequest::Ping), HELPER_REQUEST_TIMEOUT);
+    }
+
+    #[test]
+    fn apply_plan_uses_extended_timeout() {
+        let request = HelperRequest::ApplyPlan {
+            plan: FanControlPlan::new(Vec::new()),
+        };
+
+        assert_eq!(response_timeout(&request), HELPER_APPLY_PLAN_TIMEOUT);
     }
 }
